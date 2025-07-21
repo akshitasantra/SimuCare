@@ -1,0 +1,78 @@
+{
+  "title": "Anaphylactic Shock",
+  "domains": ["Airway", "Respiration & Ventilation"],
+  "patient": {
+    "age": 22,
+    "sex": "Female",
+    "chief_complaint": "Severe allergic reaction after eating peanuts"
+  },
+  "timeline": [
+    {
+      "time": 0,
+      "vitals": {
+        "HR": 125,
+        "SpO2": 84,
+        "BP": [90, 60],
+        "RR": 28
+      }
+    },
+    {
+      "time": 60,
+      "vitals": {
+        "HR": 130,
+        "SpO2": 80,
+        "BP": [88, 58],
+        "RR": 30
+      }
+    },
+    {
+      "time": 120,
+      "vitals": {
+        "HR": 140,
+        "SpO2": 76,
+        "BP": [85, 55],
+        "RR": 32
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "epi_admin",
+      "prompt": "What is the most critical first-line intervention?",
+      "options": ["Administer O2", "Administer Epinephrine", "Insert OPA"],
+      "correct_answer": "Administer Epinephrine",
+      "on_correct": {
+        "log": "Epinephrine 0.3 mg IM administered",
+        "vitals_change": {
+          "SpO2": 10,
+          "HR": -10
+        }
+      },
+      "on_wrong": {
+        "log": "Incorrect intervention. Patient condition worsening...",
+        "vitals_change": {
+          "SpO2": -5,
+          "HR": 5
+        }
+      }
+    },
+    {
+      "id": "oxygen_support",
+      "prompt": "What is your next intervention?",
+      "options": ["Administer O2", "Insert OPA", "Apply tourniquet"],
+      "correct_answer": "Administer O2",
+      "on_correct": {
+        "log": "15L/min O2 via NRB applied",
+        "vitals_change": {
+          "SpO2": 5
+        }
+      },
+      "on_wrong": {
+        "log": "Incorrect. Patient remains hypoxic.",
+        "vitals_change": {
+          "SpO2": -3
+        }
+      }
+    }
+  ]
+}
