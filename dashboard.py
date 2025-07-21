@@ -5,10 +5,10 @@ import json, time
 from dashboard_palette import PALETTE  # define your palette as before
 from vitals_panel import VitalsPanel
 from utils.logger import ActionLogger
+from modal import SelectionModal
 from logic.intervention_tree import TREE
 from logic.vitals_simulator import VitalsSimulator
 from logic.action_handler import ActionHandler
-from intervention_menu import InterventionMenu
 from logic.scoring import Scoring
 from logic.scenario_engine import ScenarioEngine
 
@@ -69,6 +69,8 @@ class Dashboard(tk.Frame):
         self.master.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
         self.master.configure(bg=PALETTE['bg'])
         self.master.columnconfigure(0, weight=1)
+        self.master.columnconfigure(0, weight=1)
+        self.master.columnconfigure(1, weight=1)
         self.master.rowconfigure(0, weight=0)
         self.master.rowconfigure(1, weight=0)
         self.master.rowconfigure(2, weight=1)
@@ -77,25 +79,58 @@ class Dashboard(tk.Frame):
     def _build_ui(self):
         style = ttk.Style(self.master)
         style.theme_use('clam')
-        default_font = ('Segoe UI', 14)
-        title_font = ('Segoe UI', 28, 'bold')
-        timer_font = ('Segoe UI', 22)
 
-        style.configure('TFrame', background=PALETTE['bg'])
-        style.configure('TLabel', background=PALETTE['bg'], foreground=PALETTE['fg'], font=default_font)
-        style.configure('Title.TLabel', font=title_font, foreground=PALETTE['accent'])
-        style.configure('Timer.TLabel', font=timer_font, foreground=PALETTE['highlight'])
+        # Updated palette: slightly lighter dark bg
+        style.configure('TFrame', background='#3B4252')
+        style.configure('TLabel',
+                        background='#3B4252',
+                        foreground='#ECEFF4',  # almost-white text
+                        font=('Arial', 16))  # larger, clearer font
 
+        style.configure('Title.TLabel',
+                        font=('Arial', 32, 'bold'),
+                        foreground='#88C0D0')
+        style.configure('Timer.TLabel',
+                        font=('Arial', 24, 'bold'),
+                        foreground='#81A1C1')
+
+        style.configure('TButton',
+                        font=('Arial', 14, 'bold'),
+                        padding=8)
+
+        # Reconfigure the frame itself
+        self.configure(bg='#3B4252')
         self.grid(sticky='nsew')
+
         # Title
-        self.title_label = ttk.Label(self, text=self.scenario['title'], style='Title.TLabel')
-        self.title_label.grid(row=0, column=0, columnspan=2, pady=(20,10), sticky='n')
+        self.title_label = ttk.Label(self,
+                                     text=self.scenario['title'],
+                                     style='Title.TLabel')
+        self.title_label.grid(row=0, column=0, columnspan=2, pady=(30, 10), sticky='n')
+
         # Timer
-        self.timer_label = ttk.Label(self, text=self._format_time(self.time_remaining), style='Timer.TLabel')
-        self.timer_label.grid(row=1, column=0, columnspan=2, pady=(0,15), sticky='n')
-        # Vitals Panel
-        self.vitals_panel = VitalsPanel(self)
-        self.vitals_panel.grid(row=2, column=0, columnspan=2, sticky='nsew', padx=30, pady=10)
+        self.timer_label = ttk.Label(self,
+                                     text=self._format_time(self.time_remaining),
+                                     style='Timer.TLabel')
+        self.timer_label.grid(row=1, column=0, columnspan=2, pady=(0, 20), sticky='n')
+
+        # Vitals Frame (for better control and centering)
+        vitals_frame = ttk.Frame(self)
+        vitals_frame.grid(row=2, column=0, columnspan=2, sticky='nsew', padx=30, pady=10)
+        vitals_frame.columnconfigure(0, weight=1)
+        vitals_frame.rowconfigure(0, weight=1)
+
+        self.vitals_panel = VitalsPanel(vitals_frame, width=7, height=4.5)
+        self.vitals_panel.grid(row=0, column=0, sticky='nsew')
+        vitals_frame.grid_propagate(False)  # Prevent shrinking if child is too small
+        vitals_frame.config(width=900)  # Optional: set max width
+
+        # Ensure the dashboard row expands
+        self.rowconfigure(2, weight=1)
+
+        # Ensure the row expands!
+        self.rowconfigure(2, weight=1)
+
         # Intervention Menu and Logger
         control_frame = ttk.Frame(self)
         control_frame.grid(row=3, column=0, columnspan=2, sticky='ew', padx=20, pady=(10,20))
@@ -105,13 +140,40 @@ class Dashboard(tk.Frame):
         self.logger = ActionLogger(control_frame)
         self.logger.grid(row=0, column=1, sticky='nsew', padx=(10,0))
 
-        self.intervention_menu = InterventionMenu(control_frame, logger=self.logger, callback=self._on_intervention)
-        self.intervention_menu.grid(row=0, column=0, sticky='ew')
-        step = self.engine.get_current_step()
-        if step:
-            self.intervention_menu.configure_options(step['options'])
+        # Add category selection section
+        intervention_frame = ttk.Frame(self)
+        intervention_frame.grid(row=3, column=0, columnspan=2, sticky='ew', padx=20, pady=(10, 0))
+        intervention_frame.columnconfigure((0, 1, 2), weight=1)  # Allow spacing
+
+        prompt_label = ttk.Label(intervention_frame, text="► Choose an Intervention Category",
+                                 style='TLabel')
+        prompt_label.grid(row=0, column=0, columnspan=3, pady=(0, 10))
+
+        # Button rows (customize as needed)
+        categories = [
+            ("Airway", 1, 0),
+            ("Breathing", 1, 1),
+            ("Circulation", 1, 2),
+            ("Meds", 2, 0),
+            ("Neuro", 2, 1),
+            ("Operations", 2, 2)
+        ]
+
+        for name, r, c in categories:
+            btn = ttk.Button(
+                intervention_frame,
+                text=name,
+                style='TButton',
+                command=lambda cat=name: self._open_modal_for_category(cat)
+            )
+            btn.grid(row=r, column=c, padx=10, pady=5, sticky='ew')
+
+    def _open_modal_for_category(self, category):
+        subtree = TREE.get(category)
+        if subtree:
+            SelectionModal(self.master, tree={category: subtree}, callback=self._on_intervention)
         else:
-            self.intervention_menu.configure_options()
+            self.logger.log([], f"No interventions available for {category}")
 
     def _format_time(self, seconds):
         mins = seconds // 60
