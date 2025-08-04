@@ -1,89 +1,71 @@
 import customtkinter as ctk
-import matplotlib
-
-matplotlib.use('TkAgg')
+from dashboard_palette import PALETTE
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from dashboard_palette import PALETTE
-
+import numpy as np
 
 class VitalsPanel(ctk.CTkFrame):
-    def __init__(self, master, width=6, height=4, dpi=100):
+    def __init__(self, master, width=6, height=3, dpi=100):
         super().__init__(master, fg_color=PALETTE['bg'], corner_radius=0)
 
-        # Data buffers
-        self.times = []
-        self.hr_data = []
-        self.spo2_data = []
-
-        # Create the figure & axes
+        # --- create matplotlib figure & axes ---
         self.figure = Figure(figsize=(width, height), dpi=dpi, facecolor=PALETTE['bg'])
         self.ax = self.figure.add_subplot(111)
-        self.figure.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.15)
 
-        # Style the axes
+        # embed canvas in Tk frame
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self)
+        widget = self.canvas.get_tk_widget()
+        widget.pack(fill="both", expand=True)
+
+    def show_ecg_snapshot(self, rhythm: str = "sinus_tachycardia", hr: int = 120, spo2: int = 98,
+                          duration: float = 10.0, fs: int = 250):
+        """Render synthetic ECG strip + vital readouts."""
+
+        # clear axes
+        self.ax.clear()
         self.ax.set_facecolor(PALETTE['bg'])
-        self.ax.tick_params(colors=PALETTE['fg'], labelsize=12)
-        self.ax.xaxis.label.set_size(14)
-        self.ax.yaxis.label.set_size(14)
-        self.ax.title.set_fontsize(16)
         for spine in self.ax.spines.values():
             spine.set_color(PALETTE['fg'])
-        self.ax.xaxis.label.set_color(PALETTE['fg'])
-        self.ax.yaxis.label.set_color(PALETTE['fg'])
-        self.ax.title.set_color(PALETTE['accent'])
+        self.ax.set_xlim(0, duration)
+        self.ax.set_ylim(-1.5, 1.5)
+        self.ax.set_title("12‑lead Snapshot", color=PALETTE['accent'])
+        self.ax.set_xlabel("Time (s)", color=PALETTE['fg'])
+        self.ax.set_ylabel("mV", color=PALETTE['fg'])
 
-        # Labels & legend
-        self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Value')
-        self.hr_line, = self.ax.plot([], [], label='HR (bpm)', color=PALETTE['accent'], linewidth=2)
-        self.spo2_line, = self.ax.plot([], [], label='SpO₂ (%)', color=PALETTE['highlight'],
-                                       linewidth=2)
-        self.ax.legend(loc='upper right', facecolor=PALETTE['bg'], labelcolor=PALETTE['fg'],
-                       fontsize=12)
+        # --- waveform generation ---
+        t = np.linspace(0, duration, int(duration * fs))
+        ecg = np.zeros_like(t)
 
-        # Layout for the CTkFrame + canvas
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        if rhythm in ("sinus_tachycardia", "svt"):
+            rr_interval = 60.0 / max(hr, 30)  # prevent divide by 0
+            qrs_width = 0.12 if rhythm == "sinus_tachycardia" else 0.06
 
-        self.canvas = FigureCanvasTkAgg(self.figure, master=self)
-        self.canvas.draw()
-        widget = self.canvas.get_tk_widget()
-        widget.grid(row=0, column=0, sticky='nsew')
+            def one_beat(time_axis):
+                beat = np.exp(-((time_axis - 0.1) ** 2) / (qrs_width ** 2)) * 1.2
+                beat += np.exp(-((time_axis - 0.2) ** 2) / 0.01) * 0.25
+                return beat
 
-        self._timer_id = None
+            for n in range(int(duration / rr_interval)):
+                start = int(n * rr_interval * fs)
+                end = start + int(0.6 * fs)
+                if end < len(t):
+                    beat_t = np.linspace(0, 0.6, end - start)
+                    ecg[start:end] += one_beat(beat_t)
 
-    def start(self, interval=1000):
-        """Begin periodic updates."""
-        self._timer_id = self.after(interval, self._update_plot)
+        elif rhythm == "vfib":
+            ecg = 0.5 * np.random.randn(len(t))
 
-    def stop(self):
-        """Stop periodic updates."""
-        if self._timer_id:
-            self.after_cancel(self._timer_id)
+        elif rhythm == "asystole":
+            ecg = np.zeros_like(t)
 
-    def update_vitals(self, current_time, hr, spo2):
-        """Append the latest vitals to the data buffers."""
-        self.times.append(current_time)
-        self.hr_data.append(hr)
-        self.spo2_data.append(spo2)
+        # plot waveform
+        self.ax.plot(t, ecg, color=PALETTE['accent'], linewidth=1.2)
 
-        # Keep only last 60 points
-        max_len = 60
-        self.times = self.times[-max_len:]
-        self.hr_data = self.hr_data[-max_len:]
-        self.spo2_data = self.spo2_data[-max_len:]
-
-    def _update_plot(self):
-        """Refresh the plot lines and schedule next update."""
-        self.hr_line.set_data(self.times, self.hr_data)
-        self.spo2_line.set_data(self.times, self.spo2_data)
-
-        if self.times:
-            self.ax.set_xlim(self.times[0], self.times[-1])
-        upper = max(max(self.hr_data or [100]), max(self.spo2_data or [100])) + 10
-        self.ax.set_ylim(50, upper)
+        # --- vital readouts ---
+        label_text = f"HR: {hr} bpm     SpO₂: {spo2}%"
+        self.ax.text(1.5, -1.2, label_text,
+                     ha='center', va='center',
+                     transform=self.ax.transData,
+                     fontsize=14, color=PALETTE['fg'], weight='bold')
 
         self.canvas.draw()
-        self._timer_id = self.after(1000, self._update_plot)
-

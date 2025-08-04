@@ -1,17 +1,12 @@
 {
   "title": "Anaphylactic Shock",
-  "domains": ["Airway", "Respiration & Ventilation"],
-  "patient": {
-    "age": 22,
-    "sex": "Female",
-    "chief_complaint": "Severe allergic reaction after eating peanuts"
-  },
+  "domains": ["Airway", "Breathing", "Circulation"],
   "timeline": [
     {
       "time": 0,
       "vitals": {
-        "HR": 125,
-        "SpO2": 84,
+        "HR": 120,
+        "SpO2": 88,
         "BP": [90, 60],
         "RR": 28
       }
@@ -20,8 +15,8 @@
       "time": 60,
       "vitals": {
         "HR": 130,
-        "SpO2": 80,
-        "BP": [88, 58],
+        "SpO2": 84,
+        "BP": [80, 55],
         "RR": 30
       }
     },
@@ -29,49 +24,37 @@
       "time": 120,
       "vitals": {
         "HR": 140,
-        "SpO2": 76,
-        "BP": [85, 55],
+        "SpO2": 80,
+        "BP": [70, 50],
         "RR": 32
       }
     }
   ],
   "steps": [
     {
-      "id": "epi_admin",
-      "prompt": "What is the most critical first-line intervention?",
-      "options": ["Administer O2", "Administer Epinephrine", "Insert OPA"],
-      "correct_answer": "Administer Epinephrine",
+      "id": "step1",
+      "prompt": "Your patient is in obvious respiratory distress after peanut exposure. What is your first action?",
+      "expected_path": ["Meds", "Epinephrine", "0.3mg_IM"],
       "on_correct": {
-        "log": "Epinephrine 0.3 mg IM administered",
-        "vitals_change": {
-          "SpO2": 10,
-          "HR": -10
-        }
+        "log": "You administered epinephrine IM.",
+        "vitals_change": {"HR": -10, "SpO2": 5}
       },
       "on_wrong": {
-        "log": "Incorrect intervention. Patient condition worsening...",
-        "vitals_change": {
-          "SpO2": -5,
-          "HR": 5
-        }
+        "log": "Incorrect first intervention. Patient continues to deteriorate.",
+        "vitals_change": {"HR": 5, "SpO2": -2}
       }
     },
     {
-      "id": "oxygen_support",
-      "prompt": "What is your next intervention?",
-      "options": ["Administer O2", "Insert OPA", "Apply tourniquet"],
-      "correct_answer": "Administer O2",
+      "id": "step2",
+      "prompt": "Patient is still hypoxic. Next priority?",
+      "expected_path": ["Primary Assessment", "Breathing Support", "Administer_O2", "15L_NRB"],
       "on_correct": {
-        "log": "15L/min O2 via NRB applied",
-        "vitals_change": {
-          "SpO2": 5
-        }
+        "log": "You applied high flow oxygen.",
+        "vitals_change": {"SpO2": 4, "RR": -2}
       },
       "on_wrong": {
-        "log": "Incorrect. Patient remains hypoxic.",
-        "vitals_change": {
-          "SpO2": -3
-        }
+        "log": "Oxygen was not provided. SpO₂ continues to drop.",
+        "vitals_change": {"SpO2": -3}
       }
     }
   ]

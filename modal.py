@@ -25,6 +25,8 @@ class SelectionModal(ctk.CTkToplevel):
         self.container = ctk.CTkScrollableFrame(
             self,
             fg_color=PALETTE['bg'],
+            scrollbar_button_color=PALETTE['accent'],
+            scrollbar_button_hover_color=PALETTE['fg'],
             corner_radius=0
         )
         self.container.pack(padx=20, pady=20, fill="both", expand=True)

@@ -37,6 +37,9 @@ TREE = {
         },
         "IV Access": {
             "Start IV": {}
+        },
+        "EKG": {
+            "12-lead": {}
         }
     },
     "Meds": {

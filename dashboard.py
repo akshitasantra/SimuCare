@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import json, time
 
-from dashboard_palette import PALETTE  # define your palette as before
+from dashboard_palette import PALETTE
 from vitals_panel import VitalsPanel
 from logger import ActionLogger
 from modal import SelectionModal
@@ -45,7 +45,7 @@ class Dashboard(ctk.CTkFrame):
         self._configure_master()
         self._build_ui()
         self._start_timer()
-        self._start_vitals_loop()
+
 
     def _configure_master(self):
         # Window setup
@@ -76,7 +76,8 @@ class Dashboard(ctk.CTkFrame):
 
     def _build_ui(self):
         # Title row
-        self.title_label = ctk.CTkLabel(self,
+        self.title_label = ctk.CTkLabel(
+            self,
             text=self.scenario['title'],
             font=ctk.CTkFont(size=32, weight="bold"),
             text_color=PALETTE['accent']
@@ -84,7 +85,8 @@ class Dashboard(ctk.CTkFrame):
         self.title_label.grid(row=0, column=0, columnspan=2, pady=(20, 5), sticky="n")
 
         # Timer
-        self.timer_label = ctk.CTkLabel(self,
+        self.timer_label = ctk.CTkLabel(
+            self,
             text=self._format_time(self.time_remaining),
             font=ctk.CTkFont(size=22, weight="bold")
         )
@@ -99,23 +101,35 @@ class Dashboard(ctk.CTkFrame):
         self.vitals_panel = VitalsPanel(vitals_frame, width=7, height=4)
         self.vitals_panel.grid(row=0, column=0, sticky="nsew")
 
-        # Intervention category buttons
+        # Prompt + Intervention categories
         cat_frame = ctk.CTkFrame(self, fg_color=PALETTE['bg'])
         cat_frame.grid(row=3, column=0, columnspan=2, padx=20, pady=(10,5), sticky="ew")
-        for i in range(3): cat_frame.grid_columnconfigure(i, weight=1)
 
-        prompt = ctk.CTkLabel(cat_frame, text="► Choose an Intervention Category",
-                              font=ctk.CTkFont(size=16, weight="bold"))
-        prompt.grid(row=0, column=0, columnspan=3, pady=(0,10))
+        # Step-specific prompt
+        self.step_prompt_label = ctk.CTkLabel(
+            cat_frame,
+            text="",  # will be filled by _update_step_prompt
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=PALETTE['fg'],
+            wraplength=600,
+            justify="center"
+        )
+        self.step_prompt_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
 
-        cats = [("Airway",1,0),("Breathing",1,1),("Circulation",1,2),
-                ("Meds",2,0),("Neuro",2,1),("Operations",2,2)]
-        for name, r, c in cats:
-            btn = ctk.CTkButton(cat_frame, text=name,
-                                 command=lambda n=name: self._open_modal_for_category(n))
-            btn.grid(row=r, column=c, padx=5, pady=5, sticky="ew")
+        # Now dynamically create category buttons from TREE
+        categories = list(TREE.keys())
+        num_cols = 3
+        for i, name in enumerate(categories):
+            r, c = divmod(i, num_cols)
+            btn = ctk.CTkButton(
+                cat_frame,
+                text=name,
+                command=lambda n=name: self._open_modal_for_category(n)
+            )
+            btn.grid(row=r+1, column=c, padx=5, pady=5, sticky="ew")
+            cat_frame.grid_columnconfigure(c, weight=1)
 
-        # Action log at bottom
+        # Action log
         log_frame = ctk.CTkFrame(self, fg_color=PALETTE['bg'])
         log_frame.grid(row=4, column=0, columnspan=2, padx=20, pady=(5, 20), sticky="nsew")
         log_frame.grid_rowconfigure(0, weight=1)
@@ -123,6 +137,9 @@ class Dashboard(ctk.CTkFrame):
 
         self.logger = ActionLogger(log_frame)
         self.logger.grid(row=0, column=0, sticky="nsew")
+
+        # Initialize step prompt
+        self._update_step_prompt()
 
     def _open_modal_for_category(self, category):
         subtree = TREE.get(category, {})
@@ -144,23 +161,43 @@ class Dashboard(ctk.CTkFrame):
             self.timer_label.configure(text=self._format_time(self.time_remaining))
             self.after(self.update_interval, self._update_timer)
 
-    def _start_vitals_loop(self):
-        self._update_vitals()
-
     def _update_vitals(self):
         t = int(self.engine.elapsed())
         hr, spo2, *_ = self.vitals_sim.get_vitals(t)
         self.vitals_panel.update_vitals(t, hr, spo2)
         self.after(self.update_interval, self._update_vitals)
 
+    def _update_step_prompt(self):
+        """Update the label with the current step's prompt text."""
+        step = self.engine.get_current_step()
+        if step:
+            self.step_prompt_label.configure(text=step.get("prompt", ""))
+        else:
+            self.step_prompt_label.configure(text="Scenario complete!")
+
     def _on_intervention(self, path):
         step = self.engine.get_current_step()
         if not step:
             return
 
-        chosen = path[-1]
-        result, feedback, vitals_delta = self.action_handler.validate(chosen)
-        self.logger.log(path, result.capitalize())
+        result, feedback, vitals_change = self.action_handler.validate(path)
+        self.logger.log(path, f"{result.capitalize()}: {feedback}")
+        self.engine.apply_vitals_change(vitals_change)
+        current_step = self.action_handler.current_step - 1  # Since current_step advanced in validate()
+        step = self.action_handler.steps[current_step]
+        self.engine.mark_step_completed(step['id'])
+
+        # Special case: show snapshot only if EKG chosen
+        if "EKG" in path:
+            step = self.engine.get_current_step()
+            rhythm = step.get("rhythm", "sinus_tachycardia")
+
+            t = int(self.engine.elapsed())
+            hr, spo2, *_ = self.vitals_sim.get_vitals(t)
+
+            self.vitals_panel.show_ecg_snapshot(rhythm=rhythm, hr=hr, spo2=spo2)
+            self.logger.log(path,
+                            f"12‑lead taken → rhythm: {rhythm.replace('_', ' ').title()} | HR {hr} | SpO₂ {spo2}%")
 
         # Scoring
         self.scoring.end_step(result == 'correct')
@@ -168,8 +205,11 @@ class Dashboard(ctk.CTkFrame):
             next_step = self.scenario['steps'][self.action_handler.current_step]['id']
             self.scoring.start_step(next_step)
 
-        # Mark step done in engine
+        # Mark step done
         self.engine.mark_step_completed(step['id'])
+
+        # Update prompt for next step
+        self._update_step_prompt()
 
         # If scenario over
         if not self.engine.get_current_step():
@@ -177,6 +217,18 @@ class Dashboard(ctk.CTkFrame):
             summary = self.scoring.summary()
             self.logger.log([], f"Accuracy: {summary['accuracy'] * 100:.1f}%")
             self.logger.log([], f"Avg. response: {summary['average_time_sec']:.1f}s")
+
+    def refresh_snapshot(self):
+        """Draw the current vitals buffer once (no looping)."""
+        self.hr_line.set_data(self.times, self.hr_data)
+        self.spo2_line.set_data(self.times, self.spo2_data)
+
+        if self.times:
+            self.ax.set_xlim(self.times[0] - 1, self.times[0] + 1)  # just a tight window
+        upper = max(max(self.hr_data or [100]), max(self.spo2_data or [100])) + 10
+        self.ax.set_ylim(50, upper)
+
+        self.canvas.draw()
 
     def run(self):
         self.start_time = time.time()

@@ -1,49 +1,36 @@
-# logic/action_handler.py
-
 from typing import List, Tuple, Dict, Any
 
 class ActionHandler:
     """
     Validates user-selected intervention paths against the current scenario steps.
-    Applies immediate feedback logic (correct vs. wrong) and returns:
-      - result: 'correct' or 'wrong'
-      - feedback: the corresponding log message
-      - vitals_change: dict of vitals deltas defined in the scenario
+    Uses expected_path from scenario JSON to determine correctness.
     """
+
     def __init__(self, scenario: Dict[str, Any]):
-        """
-        :param scenario: loaded JSON dict for a scenario, which must include:
-            - 'steps': list of step dicts with keys:
-                'id', 'prompt', 'options', 'correct_answer',
-                'on_correct': { 'log', 'vitals_change'... },
-                'on_wrong': { 'log', 'vitals_change'... }
-        """
         self.steps = scenario.get("steps", [])
         self.current_step = 0
 
-    def validate(self, selected_option: str) -> Tuple[str, str, Dict[str, int]]:
+    def validate(self, selected_path: List[str]) -> Tuple[str, str, Dict[str, int]]:
         """
         Validate the user's choice for the current step.
 
-        :param selected_option: one of the strings in step['options']
+        :param selected_path: full path list from TREE, e.g. ["Meds","Epinephrine","0.3mg_IM"]
         :returns: (result, feedback_log, vitals_change)
         """
         if self.current_step >= len(self.steps):
             raise IndexError("No more steps in scenario.")
 
         step = self.steps[self.current_step]
-        correct = step["correct_answer"]
+        expected = step["expected_path"]
 
-        if selected_option == correct:
+        if selected_path == expected:
             outcome = step.get("on_correct", {})
             result = "correct"
         else:
             outcome = step.get("on_wrong", {})
             result = "wrong"
 
-        # Advance to next step
         self.current_step += 1
-
         feedback = outcome.get("log", "")
         vitals_change = outcome.get("vitals_change", {})
 
