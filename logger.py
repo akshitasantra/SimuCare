@@ -1,60 +1,58 @@
-import tkinter as tk
-from tkinter import ttk
 import datetime
+import customtkinter as ctk
+from dashboard_palette import PALETTE
 
-# Color palette
-PALETTE = {
-    'bg': '#2E3440',
-    'fg': '#D8DEE9',
-    'accent': '#88C0D0'
-}
+class ActionLogger(ctk.CTkFrame):
+    def __init__(self, master, width=400, height=200):
+        super().__init__(master, fg_color=PALETTE['bg'], corner_radius=8,
+                         border_width=1, border_color=PALETTE['accent'])
+        # Configure sizing
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.configure(width=width, height=height)
 
-class ActionLogger(ttk.Frame):
-    def __init__(self, master, height=10):
-        super().__init__(master, style='TFrame')
-        self.configure(height=height)
-
-        # Create a scrollbar and text widget
-        self.scrollbar = ttk.Scrollbar(self, orient='vertical')
-        self.text = tk.Text(
+        # Create a themed textbox for logging (has its own scrollbar)
+        self.textbox = ctk.CTkTextbox(
             self,
-            wrap='none',
-            yscrollcommand=self.scrollbar.set,
-            bg=PALETTE['bg'],
-            fg=PALETTE['fg'],
-            insertbackground=PALETTE['fg'],
-            relief='flat',
-            font=('Segoe UI', 12)
+            width=width,
+            height=height,
+            corner_radius=4,
+            border_width=0,
+            fg_color=PALETTE['bg'],
+            text_color=PALETTE['fg'],
+            scrollbar_button_color=PALETTE['accent'],
+            scrollbar_button_hover_color=PALETTE['fg'],
+            font=("Helvetica", 18)
         )
-        self.scrollbar.config(command=self.text.yview)
-
-        # Layout
-        self.text.pack(side='left', fill='both', expand=True)
-        self.scrollbar.pack(side='right', fill='y')
-
-        # Disable direct editing
-        self.text.configure(state='disabled')
+        self.textbox.grid(row=0, column=0, padx=8, pady=8, sticky='nsew')
+        self.textbox.configure(state='disabled')
 
     def log(self, path, result):
+        """
+        Append a timestamped entry to the read-only textbox.
+        :param path: list of strings, the chosen intervention path
+        :param result: string, e.g. 'Correct' or 'Wrong'
+        """
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        message = f"[{timestamp}] Path: {path} → {result}\n"
-        # Enable, insert, disable to keep read-only
-        self.text.configure(state='normal')
-        self.text.insert('end', message)
-        self.text.see('end')
-        self.text.configure(state='disabled')
+        entry = f"[{timestamp}] {path} → {result}\n"
+        # Enable, insert, then disable again
+        self.textbox.configure(state='normal')
+        self.textbox.insert('end', entry)
+        self.textbox.see('end')
+        self.textbox.configure(state='disabled')
+
 
 if __name__ == '__main__':
-    root = tk.Tk()
-    style = ttk.Style(root)
-    style.theme_use('clam')
-    style.configure('TFrame', background=PALETTE['bg'])
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("dark-blue")
 
-    logger = ActionLogger(root)
-    logger.pack(fill='both', expand=True)
+    app = ctk.CTk()
+    app.geometry("500x300")
+    logger = ActionLogger(app)
+    logger.grid(row=0, column=0, padx=20, pady=20, sticky='nsew')
 
-    # Test logs
+    # Test entries
     logger.log(['Meds','Epinephrine','0.3mg_IM'], 'Correct')
     logger.log(['Breathing','Administer_O2','15L_NRB'], 'Wrong')
 
-    root.mainloop()
+    app.mainloop()

@@ -1,9 +1,7 @@
-# logic/intervention_tree.py
 """
 Global intervention tree defining category → action → detail structure.
 """
 
-# Example tree; expand with full EMT intervention options as needed
 TREE = {
     "Scene": {
         "Wear PPE": {
