@@ -2,17 +2,14 @@ import customtkinter as ctk
 import json, time
 
 from dashboard_palette import PALETTE
-from vitals_panel import VitalsPanel
 from logger import ActionLogger
 from modal import SelectionModal
 from logic.intervention_tree import TREE
-from logic.vitals_simulator import VitalsSimulator
 from logic.action_handler import ActionHandler
 from logic.scoring import Scoring
 from logic.scenario_engine import ScenarioEngine
 
 
-# Initialize the customtkinter appearance
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
@@ -25,20 +22,17 @@ class Dashboard(ctk.CTkFrame):
         super().__init__(master)
         self.master = master
         self.update_interval = update_interval
-        self.time_remaining = 900  # seconds
+        self.time_remaining = 600  # seconds
 
-        # Load scenario
+        # ----- Load Scenario -----
         with open(scenario_file) as f:
             self.scenario = json.load(f)
 
-        # Scenario engine + handlers
+        # Engine + scoring
         self.engine = ScenarioEngine(self.scenario)
         self.engine.start()
-        self.vitals_sim = VitalsSimulator(self.scenario['timeline'])
+        self.scoring = Scoring(total_required=len(self.scenario.get("required_paths", [])))
         self.action_handler = ActionHandler(self.scenario)
-        self.scoring = Scoring(total_steps=len(self.scenario.get('steps', [])))
-        if self.scenario.get('steps'):
-            self.scoring.start_step(self.scenario['steps'][0]['id'])
 
         self.start_time = time.time()
 
@@ -46,43 +40,36 @@ class Dashboard(ctk.CTkFrame):
         self._build_ui()
         self._start_timer()
 
-
     def _configure_master(self):
-        # Window setup
         self.master.title("SimuCare")
         self.master.geometry(f"{self.MIN_WIDTH}x{self.MIN_HEIGHT}")
         self.master.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
 
-        # Put Dashboard in a single expanding cell
         self.grid(row=0, column=0, sticky="nsew")
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
 
-        # - rows 0 (title) and 1 (timer) should be fixed height (weight=0)
-        # - row 2 (vitals) gets most of the extra space
-        # - row 3 (categories) small, row 4 (log) gets some
+        # Main rows: title, timer, cat_frame, log_frame
+        for r in range(4):
+            if r == 2:
+                self.grid_rowconfigure(r, weight=0)  # cat_frame tight
+            elif r == 3:
+                self.grid_rowconfigure(r, weight=1)  # log_frame expands
+            else:
+                self.grid_rowconfigure(r, weight=0)
 
-        for r in range(5):
-            weight = 0
-
-        if r == 2:
-            weight = 5
-        elif r == 4:
-            weight = 2
-        self.grid_rowconfigure(r, weight=weight)
-        # Two columns both expand equally
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
     def _build_ui(self):
-        # Title row
+        # Title
         self.title_label = ctk.CTkLabel(
             self,
-            text=self.scenario['title'],
+            text=self.scenario.get("title", "Scenario"),
             font=ctk.CTkFont(size=32, weight="bold"),
-            text_color=PALETTE['accent']
+            text_color=PALETTE["accent"]
         )
-        self.title_label.grid(row=0, column=0, columnspan=2, pady=(20, 5), sticky="n")
+        self.title_label.grid(row=0, column=0, columnspan=2, pady=(10, 2), sticky="n")
 
         # Timer
         self.timer_label = ctk.CTkLabel(
@@ -90,35 +77,26 @@ class Dashboard(ctk.CTkFrame):
             text=self._format_time(self.time_remaining),
             font=ctk.CTkFont(size=22, weight="bold")
         )
-        self.timer_label.grid(row=1, column=0, columnspan=2, pady=(0, 10), sticky="n")
+        self.timer_label.grid(row=1, column=0, columnspan=2, pady=(0, 5), sticky="n")
 
-        # Vitals panel
-        vitals_frame = ctk.CTkFrame(self, fg_color=PALETTE['bg'])
-        vitals_frame.grid(row=2, column=0, columnspan=2, padx=20, pady=10, sticky="nsew")
-        vitals_frame.grid_rowconfigure(0, weight=1)
-        vitals_frame.grid_columnconfigure(0, weight=1)
+        # Prompt + categories container
+        cat_frame = ctk.CTkFrame(self, fg_color=PALETTE["bg"])
+        cat_frame.grid(row=2, column=0, columnspan=2, padx=20, pady=(5, 5), sticky="new")
 
-        self.vitals_panel = VitalsPanel(vitals_frame, width=7, height=4)
-        self.vitals_panel.grid(row=0, column=0, sticky="nsew")
-
-        # Prompt + Intervention categories
-        cat_frame = ctk.CTkFrame(self, fg_color=PALETTE['bg'])
-        cat_frame.grid(row=3, column=0, columnspan=2, padx=20, pady=(10,5), sticky="ew")
-
-        # Step-specific prompt
+        # Initial case description
         self.step_prompt_label = ctk.CTkLabel(
             cat_frame,
-            text="",  # will be filled by _update_step_prompt
+            text=self.scenario.get("description", ""),
             font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=PALETTE['fg'],
+            fg_color=PALETTE["bg"],
             wraplength=600,
             justify="center"
         )
-        self.step_prompt_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+        self.step_prompt_label.grid(row=0, column=0, columnspan=4, pady=(0, 8), sticky="n")
 
-        # Now dynamically create category buttons from TREE
+        # Category buttons
         categories = list(TREE.keys())
-        num_cols = 3
+        num_cols = 4
         for i, name in enumerate(categories):
             r, c = divmod(i, num_cols)
             btn = ctk.CTkButton(
@@ -126,20 +104,34 @@ class Dashboard(ctk.CTkFrame):
                 text=name,
                 command=lambda n=name: self._open_modal_for_category(n)
             )
-            btn.grid(row=r+1, column=c, padx=5, pady=5, sticky="ew")
+            btn.grid(row=r + 1, column=c, padx=4, pady=4, sticky="ew")
             cat_frame.grid_columnconfigure(c, weight=1)
 
+        # Ensure cat_frame rows don't stretch
+        for r in range(len(categories) // num_cols + 2):
+            cat_frame.grid_rowconfigure(r, weight=0)
+
         # Action log
-        log_frame = ctk.CTkFrame(self, fg_color=PALETTE['bg'])
-        log_frame.grid(row=4, column=0, columnspan=2, padx=20, pady=(5, 20), sticky="nsew")
+        log_frame = ctk.CTkFrame(self, fg_color=PALETTE["bg"])
+        log_frame.grid(row=3, column=0, columnspan=2, padx=20, pady=(5, 5), sticky="nsew")
         log_frame.grid_rowconfigure(0, weight=1)
         log_frame.grid_columnconfigure(0, weight=1)
 
         self.logger = ActionLogger(log_frame)
         self.logger.grid(row=0, column=0, sticky="nsew")
 
-        # Initialize step prompt
-        self._update_step_prompt()
+        # End Scenario button under the logger, same width
+        self.end_button = ctk.CTkButton(
+            self,
+            text="End Scenario",
+            fg_color=None,  # same color as the other CTkButtons
+            command=self._end_scenario
+        )
+        self.end_button.grid(row=4, column=0, columnspan=2, padx=20, pady=(5, 10), sticky="ew")
+
+        # Adjust main grid row weights so log_frame expands and button stays below
+        self.grid_rowconfigure(3, weight=1)  # log_frame expands
+        self.grid_rowconfigure(4, weight=0)  # button stays fixed
 
     def _open_modal_for_category(self, category):
         subtree = TREE.get(category, {})
@@ -161,84 +153,58 @@ class Dashboard(ctk.CTkFrame):
             self.timer_label.configure(text=self._format_time(self.time_remaining))
             self.after(self.update_interval, self._update_timer)
 
-    def _update_vitals(self):
-        t = int(self.engine.elapsed())
-        hr, spo2, *_ = self.vitals_sim.get_vitals(t)
-        self.vitals_panel.update_vitals(t, hr, spo2)
-        self.after(self.update_interval, self._update_vitals)
-
-    def _update_step_prompt(self):
-        """Update the label with the current step's prompt text."""
-        step = self.engine.get_current_step()
-        if step:
-            self.step_prompt_label.configure(text=step.get("prompt", ""))
-        else:
-            self.step_prompt_label.configure(text="Scenario complete!")
-
+    # ---------- New intervention handler ----------
     def _on_intervention(self, path):
-        step = self.engine.get_current_step()
-        if not step:
+        if self.time_remaining == 0:
+            self.logger.log([], "Scenario has ended. No further actions allowed.")
             return
 
-        result, feedback, vitals_change = self.action_handler.validate(path)
-        self.logger.log(path, f"{result.capitalize()}: {feedback}")
-        self.engine.apply_vitals_change(vitals_change)
-        current_step = self.action_handler.current_step - 1  # Since current_step advanced in validate()
-        step = self.action_handler.steps[current_step]
-        self.engine.mark_step_completed(step['id'])
+        self.scoring.start_action(path)
+        result = self.engine.process_action(path)
+        self.scoring.record_action(path, result["result"])
 
-        # Special case: show snapshot only if EKG chosen
-        if "EKG" in path:
-            step = self.engine.get_current_step()
-            rhythm = step.get("rhythm", "sinus_tachycardia")
+        # Update prompt with any follow-up info
+        if result["result"] == "required":
+            prompt = result.get("prompt") or "Action acknowledged."
+            self.step_prompt_label.configure(text=prompt)
+            self.logger.log(path, f"✅ {prompt}")
+        elif result["result"] == "harmful":
+            self.logger.log(path, "⚠️ Harmful action selected!")
+        else:
+            self.logger.log(path, "No effect.")
 
-            t = int(self.engine.elapsed())
-            hr, spo2, *_ = self.vitals_sim.get_vitals(t)
-
-            self.vitals_panel.show_ecg_snapshot(rhythm=rhythm, hr=hr, spo2=spo2)
-            self.logger.log(path,
-                            f"12‑lead taken → rhythm: {rhythm.replace('_', ' ').title()} | HR {hr} | SpO₂ {spo2}%")
-
-        # Scoring
-        self.scoring.end_step(result == 'correct')
-        if self.action_handler.has_more_steps():
-            next_step = self.scenario['steps'][self.action_handler.current_step]['id']
-            self.scoring.start_step(next_step)
-
-        # Mark step done
-        self.engine.mark_step_completed(step['id'])
-
-        # Update prompt for next step
-        self._update_step_prompt()
-
-        # If scenario over
-        if not self.engine.get_current_step():
-            self.logger.log([], 'Scenario Complete')
+        # Scenario end check
+        if self.engine.is_completed():
             summary = self.scoring.summary()
-            self.logger.log([], f"Accuracy: {summary['accuracy'] * 100:.1f}%")
-            self.logger.log([], f"Avg. response: {summary['average_time_sec']:.1f}s")
+            if summary["scenario_failed"]:
+                self.logger.log([], "⚠️ Scenario failed due to harmful actions.")
+            else:
+                self.logger.log([], "✅ Scenario complete!")
+            self.logger.log([], f"Points: {summary['total_points']}")
 
-    def refresh_snapshot(self):
-        """Draw the current vitals buffer once (no looping)."""
-        self.hr_line.set_data(self.times, self.hr_data)
-        self.spo2_line.set_data(self.times, self.spo2_data)
+    def _end_scenario(self):
+        # Scenario failed if engine or scoring says harmful selected
+        if self.engine.scenario_failed() or self.scoring.harmful:
+            self.logger.log([], "⚠️ Scenario ended: harmful actions were selected.")
+        else:
+            self.logger.log([], "✅ Scenario ended by user.")
 
-        if self.times:
-            self.ax.set_xlim(self.times[0] - 1, self.times[0] + 1)  # just a tight window
-        upper = max(max(self.hr_data or [100]), max(self.spo2_data or [100])) + 10
-        self.ax.set_ylim(50, upper)
+        summary = self.scoring.summary()
+        self.logger.log([], f"Points: {summary['total_points']} / {summary['total_possible']}")
 
-        self.canvas.draw()
+        # Stop the timer
+        self.time_remaining = 0
 
     def run(self):
         self.start_time = time.time()
-        self.pack(fill='both', expand=True)
+        self.pack(fill="both", expand=True)
+
 
 if __name__ == "__main__":
     app = ctk.CTk()
     app.grid_rowconfigure(0, weight=1)
     app.grid_columnconfigure(0, weight=1)
 
-    dash = Dashboard(app, scenario_file='scenarios/sample.json')
+    dash = Dashboard(app, scenario_file="scenarios/medical_sample.json")
     dash.run()
     app.mainloop()

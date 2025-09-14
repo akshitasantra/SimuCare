@@ -12,6 +12,15 @@ class SelectionModal(ctk.CTkToplevel):
         self._configure_window(title)
         self._show_level(self.tree)
 
+        first_key, first_subtree = next(iter(self.tree.items()))
+        self.selected_path.append(first_key)
+        if isinstance(first_subtree, dict) and first_subtree:
+            self._show_level(first_subtree, level=2)
+        else:
+            if self.callback:
+                self.callback(self.selected_path)
+            self.destroy()
+
     def _configure_window(self, title):
         self.title(title)
         self.configure(fg_color=PALETTE['bg'])
@@ -73,6 +82,8 @@ class SelectionModal(ctk.CTkToplevel):
         if isinstance(subtree, dict) and subtree:
             self._show_level(subtree, level + 1)
         else:
+            print("Modal callback with path:", self.selected_path)  # Debug
             if self.callback:
                 self.callback(self.selected_path)
             self.destroy()
+

@@ -1,76 +1,51 @@
-# logic/scoring.py
-
-import time
 from typing import List, Dict, Any
+import time
 
 class Scoring:
     """
-    Tracks user performance across scenario steps, including correctness and response times.
-    After the scenario, can compute summary statistics.
+    Scoring for the flat scenario format:
+      • +1 for each required path completed
+      • 0 accuracy if any harmful action chosen
+      • Tracks timing and history
     """
+    def __init__(self, total_required: int):
+        self.total_required = total_required
+        self.completed: List[List[str]] = []
+        self.harmful: List[List[str]] = []
+        self.records: List[Dict[str, Any]] = []
+        self._start_times: Dict[str, float] = {}  # key: str(path) for timing
 
-    def __init__(self, total_steps: int):
-        """
-        :param total_steps: total number of decision steps in the scenario
-        """
-        self.total_steps = total_steps
-        self.records: List[Dict[str, Any]] = []  # each record: {step_id, correct, time_taken}
+    def start_action(self, path: List[str]):
+        self._start_times[str(path)] = time.time()
 
-        # Internal state for timing
-        self._step_start: float = None
-        self._current_step_id: Any = None
-
-    def start_step(self, step_id: Any):
-        """
-        Call when a new step is presented to the user.
-        :param step_id: unique identifier of the step (e.g. 'epi_admin')
-        """
-        self._step_start = time.time()
-        self._current_step_id = step_id
-
-    def end_step(self, correct: bool):
-        """
-        Call immediately after the user confirms their choice.
-        Records correctness and time taken.
-        :param correct: True if the user chose the correct answer
-        """
-        if self._step_start is None or self._current_step_id is None:
-            raise RuntimeError("start_step() must be called before end_step().")
-
-        elapsed = time.time() - self._step_start
+    def record_action(self, path: List[str], result: str):
+        elapsed = time.time() - self._start_times.get(str(path), time.time())
         self.records.append({
-            "step_id": self._current_step_id,
-            "correct": correct,
+            "path": path,
+            "result": result,
             "time_taken": elapsed
         })
-
-        # Reset for next step
-        self._step_start = None
-        self._current_step_id = None
+        if result == "required":
+            if path not in self.completed:
+                self.completed.append(path)
+        elif result == "harmful":
+            if path not in self.harmful:
+                self.harmful.append(path)
 
     def summary(self) -> Dict[str, Any]:
-        """
-        Returns a summary of performance:
-          - total_steps
-          - answered_steps
-          - correct_count
-          - incorrect_count
-          - accuracy (0.0–1.0)
-          - average_time (secs)
-          - per-step breakdown
-        """
-        answered = len(self.records)
-        correct = sum(1 for r in self.records if r["correct"])
-        incorrect = answered - correct
-        accuracy = correct / self.total_steps if self.total_steps else 0.0
-        avg_time = sum(r["time_taken"] for r in self.records) / answered if answered else 0.0
-
+        scenario_failed = bool(self.harmful)
+        total_points = len(self.completed)
+        total_possible = self.total_required
+        accuracy = 0.0 if scenario_failed else (
+            total_points / total_possible if total_possible else 0.0
+        )
         return {
-            "total_steps": self.total_steps,
-            "answered_steps": answered,
-            "correct_count": correct,
-            "incorrect_count": incorrect,
+            "completed_paths": self.completed,
+            "harmful_paths": self.harmful,
+            "total_points": total_points,
+            "total_possible": total_possible,  # NEW
             "accuracy": accuracy,
-            "average_time_sec": avg_time,
+            "scenario_failed": scenario_failed,
             "records": self.records.copy()
         }
+

@@ -1,69 +1,63 @@
+from typing import Dict, Any, List
 import time
-from typing import Dict, Any
 
 class ScenarioEngine:
     """
-    Manages scenario progression:
-     - Tracks elapsed time
-     - Provides current timeline vitals
-     - Tracks completion of scenario steps
+    Scenario logic for the *new* JSON format:
+      {
+        "title": "...",
+        "description": "...",      # first prompt text
+        "required_paths": [        # list of dicts
+            {"path": [...], "prompt": "..."},
+            ...
+        ],
+        "harmful_paths": [ [...], ... ]
+      }
     """
-
     def __init__(self, scenario: Dict[str, Any]):
         self.title = scenario.get("title", "")
-        self.domains = scenario.get("domains", [])
-        self.timeline = scenario.get("timeline", [])
-        self.steps = scenario.get("steps", [])
-        self.start_time = None
+        self.description = scenario.get("description", "")
+        self.required_paths: List[Dict[str, Any]] = scenario.get("required_paths", [])
+        self.harmful_paths: List[List[str]] = scenario.get("harmful_paths", [])
+
+        self.start_time: float | None = None
+        self.completed: List[List[str]] = []          # paths the user successfully chose
+        self.harmful_selected: List[List[str]] = []   # harmful paths the user clicked
 
     def start(self):
         self.start_time = time.time()
 
     def elapsed(self) -> float:
-        if self.start_time is None:
-            return 0.0
-        return time.time() - self.start_time
+        return time.time() - self.start_time if self.start_time else 0.0
 
-    def get_current_timeline_index(self) -> int:
-        t = self.elapsed()
-        idx = 0
-        for i, pt in enumerate(self.timeline):
-            if pt["time"] <= t:
-                idx = i
-            else:
-                break
-        return idx
+    def process_action(self, path: List[str]) -> Dict[str, Any]:
+        """
+        Called whenever the user clicks an intervention path.
+        Returns a dict with the outcome and any follow-up prompt.
+        """
+        # harmful check first
+        if path in self.harmful_paths:
+            if path not in self.harmful_selected:
+                self.harmful_selected.append(path)
+            return {"result": "harmful", "prompt": None}
 
-    def get_current_vitals(self) -> Dict[str, Any]:
-        idx = self.get_current_timeline_index()
-        return self.timeline[idx].get("vitals", {})
+        # required check
+        for rp in self.required_paths:
+            if path == rp["path"] and path not in self.completed:
+                self.completed.append(path)
+                return {"result": "required", "prompt": rp.get("prompt", "")}
 
-    def get_current_step(self) -> Dict[str, Any]:
-        for step in self.steps:
-            if not step.get("_completed", False):
-                return step
-        return None
+        return {"result": "unknown", "prompt": None}
 
-    def mark_step_completed(self, step_id: str):
-        for step in self.steps:
-            if step["id"] == step_id:
-                step["_completed"] = True
-                break
+    def is_completed(self) -> bool:
+        """True if all required paths have been selected (order doesn’t matter)."""
+        return len(self.completed) == len(self.required_paths)
+
+    def scenario_failed(self) -> bool:
+        """True if any harmful path has been selected."""
+        return len(self.harmful_selected) > 0
 
     def reset(self):
         self.start_time = None
-        for step in self.steps:
-            step.pop("_completed", None)
-
-    def apply_vitals_change(self, vitals_change: Dict[str, int]):
-        """Apply additive changes to the latest vitals point in the timeline."""
-        if not self.timeline:
-            return
-
-        # modify the last timeline point (or current index)
-        idx = self.get_current_timeline_index()
-        vitals = self.timeline[idx]['vitals']
-
-        for k, delta in vitals_change.items():
-            if k in vitals and vitals[k] is not None:
-                vitals[k] += delta
+        self.completed.clear()
+        self.harmful_selected.clear()

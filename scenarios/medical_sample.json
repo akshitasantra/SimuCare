@@ -1,0 +1,142 @@
+{
+  "title": "Medical Scenario",
+  "description": "Dispatched to the local baseball fields for a male complaining of shortness of breath.",
+  "required_paths": [
+    {
+      "path": ["Scene", "Scene Safety", "BSI/PPE"],
+      "prompt": "You have donned PPE."
+    },
+    {
+      "path": ["Scene", "Scene Safety", "Scene Safe?"],
+      "prompt": "Scene is safe."
+    },
+    {
+      "path": ["Scene", "Determine nature of Illness"],
+      "prompt": "Difficulty Breathing"
+    },
+    {
+      "path": ["Scene", "Determine the number of patients"],
+      "prompt": "1 patient"
+    },
+    {
+      "path": ["Scene", "Determine the number of patients"],
+      "prompt": "1 patient"
+    },
+    {
+      "path": ["Scene", "Spine stabilization", "Don't stabilize spine"],
+      "prompt": ""
+    },
+    {
+      "path": ["Primary Assessment", "General Impression"],
+      "prompt": "Middle aged male sitting on a lawn mower holding his chest in obvious distress."
+    },
+    {
+      "path": ["Primary Assessment", "Determine responsiveness/level of consciousness (AVPU)"],
+      "prompt": "A&Ox3"
+    },
+    {
+      "path": ["Primary Assessment", "Breathing", "Assess Breathing", "Rate/Quality"],
+      "prompt": "Irregular due to anxiety, able to talk in full sentences, wheezing audible, 92% O2 levels."
+    },
+    {
+      "path": ["Primary Assessment", "Breathing", "Administer O2", "NC"],
+      "prompt": "Oxygen is being delivered."
+    },
+    {
+      "path": ["Primary Assessment", "Breathing",  "Administer O2", "NRB"],
+      "prompt": "Oxygen is being delivered."
+    },
+    {
+      "path": ["Primary Assessment", "Breathing",  "Administer O2", "BVM Ventilation"],
+      "prompt": "Oxygen is being delivered."
+    },
+    {
+      "path": ["Primary Assessment", "Breathing",  "Administer O2", "CPAP"],
+      "prompt": "Oxygen is being delivered."
+    },
+    {
+      "path": ["Primary Assessment", "Airway", "Open Airway", "Head Tilt-Chin Lift"],
+      "prompt": "Patient airway is swelling."
+    },
+    {
+      "path": ["Primary Assessment", "Circulation", "Pulse Check"],
+      "prompt": "114 beats per minute"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "History of present illness", "Onset"],
+      "prompt": "Minutes after being stung"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "History of present illness", "Provocation"],
+      "prompt": "Progressively getting worse"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "History of present illness", "Quality"],
+      "prompt": "Itching chest and neck"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "History of present illness", "Radiation"],
+      "prompt": "Towards throat"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "History of present illness", "Severity"],
+      "prompt": "4, getting worse"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "History of present illness", "Time"],
+      "prompt": "Feels similar to last reaction"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "Past medical history", "Allergies"],
+      "prompt": "Bees"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "Past medical history", "Signs and Symptoms"],
+      "prompt": "Itching, difficulty breathing"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "Past medical history", "Medications"],
+      "prompt": "Epi-pen in the glove box of vehicle"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "Past medical history", "Past medical history"],
+      "prompt": "Asthma with inhaler, anaphylaxis"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "Past medical history", ",Last oral intake"],
+      "prompt": "Breakfast this morning"
+    },
+    {
+      "path": ["Primary Assessment", "History Taking", "Past medical history", "Events leading up to the incident"],
+      "prompt": "Mowing grass when he felt a sting"
+    },
+    {
+      "path": ["Secondary Assessment", "Vital Signs", "HR"],
+      "prompt": "142 bpm"
+    },
+    {
+      "path": ["Secondary Assessment", "Vital Signs", "RR"],
+      "prompt": "28 breaths per minute"
+    },
+    {
+      "path": ["Secondary Assessment", "Vital Signs", "BP"],
+      "prompt": "90/62"
+    },
+    {
+      "path": ["Secondary Assessment", "Vital Signs", "D-stick"],
+      "prompt": "100mg/dl"
+    },
+    {
+      "path": ["Medications", "Epinephrine", "0.3 mg IM (Adult auto-injector)"],
+      "prompt": "Epinephrine administered; RR: 24, B/P: 132/94, HR: 130 strong"
+    }
+  ],
+  "harmful_paths": [
+    ["Medications", "Nitroglycerin", "0.4 mg pill/spray"],
+    ["Medications", "Aspirin", "160-325 mg"],
+    ["Medications", "Glucagon", "1 mg IN per nostril (max 2 mg)"],
+    ["Medications", "Naloxone", "2 mg IN (1 mg/nostril)"],
+    ["Medications", "Naloxone", "Repeat q5 min PRN"],
+    ["Medications", "Epinephrine", "0.15 mg IM (Peds auto-injector)"]
+  ]
+}

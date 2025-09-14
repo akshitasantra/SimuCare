@@ -15,7 +15,7 @@ class ActionHandler:
         Validate the user's choice for the current step.
 
         :param selected_path: full path list from TREE, e.g. ["Meds","Epinephrine","0.3mg_IM"]
-        :returns: (result, feedback_log, vitals_change)
+        :returns: (result, feedback_log)
         """
         if self.current_step >= len(self.steps):
             raise IndexError("No more steps in scenario.")
@@ -32,9 +32,8 @@ class ActionHandler:
 
         self.current_step += 1
         feedback = outcome.get("log", "")
-        vitals_change = outcome.get("vitals_change", {})
 
-        return result, feedback, vitals_change
+        return result, feedback
 
     def has_more_steps(self) -> bool:
         """Return True if there are more interaction steps remaining."""
