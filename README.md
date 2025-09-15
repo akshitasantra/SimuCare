@@ -8,15 +8,18 @@ SimuCare guides EMT students through timed, vitals‑driven scenarios. Users mak
 
 ##  Features
 
-- **15‑minute global timer** simulating real scene urgency  
-- **Vitals graph** (HR & SpO₂) updating each second via Matplotlib  
+- **10‑minute global timer** simulating real scene urgency  
 - **Step‑by‑step decision prompts** (choose intervention → confirm)  
-- **Immediate feedback** on correctness plus vitals impact  
+- **Immediate feedback** on correctness
 - **Action log** with timestamps, choices, and results  
 - **Performance scoring**: accuracy %, average response time  
 - **Modular architecture**: scenario engine, vitals simulator, action handler, scoring
 
 ---
+
+
+https://github.com/user-attachments/assets/0ecac652-89b9-47e3-8ef3-94b5070ce88b
+
 
 ## Installation
 
